@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "clicker",
+	"version": "${version}",
+	"name": "Clicker",
+	"description": "A polished, Sakura-themed autoclicker for Minecraft 1.21.11: independent left and right clicking (1-100 CPS), toggle or hold activation, optional double clicks, right-click item protection and a smooth rounded GUI with six theme presets. Press H to open the GUI and G to switch Clicker on or off.",
+	"icon": "assets/clicker/icon.png",
+	"license": "MIT",
+	"contact": {
+		"homepage": "https://github.com/FelixSynnn/clicker",
+		"sources": "https://github.com/FelixSynnn/clicker",
+		"issues": "https://github.com/FelixSynnn/clicker/issues"
+	},
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"clicker.ClickerClient"
+		],
+		"modmenu": [
+			"clicker.compat.ModMenuIntegration"
+		]
+	},
+	"mixins": [
+		"clicker.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "1.21.11",
+		"java": ">=21",
+		"fabric-api": ">=0.141.0"
+	},
+	"suggests": {
+		"modmenu": ">=17.0.0"
+	}
+}

@@ -1,0 +1,17 @@
+{
+	"schemaVersion": 1,
+	"id": "clicker-gametest",
+	"version": "1.0.0",
+	"name": "Clicker In-Game Tests",
+	"description": "Drives Clicker inside a real Minecraft 1.21.11 client (dev only, not shipped).",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"clicker.gametest.ClickerClientGameTest"
+		]
+	},
+	"depends": {
+		"clicker": "*",
+		"fabric-client-gametest-api-v1": "*"
+	}
+}

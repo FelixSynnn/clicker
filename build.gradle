@@ -1,0 +1,133 @@
+plugins {
+	// 1.21.11 is the last obfuscated Minecraft release, so it uses the remapping flavour of Loom.
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	maven {
+		name = 'TerraformersMC'
+		url = 'https://maven.terraformersmc.com/releases/'
+		content {
+			includeGroup 'com.terraformersmc'
+		}
+	}
+}
+
+loom {
+	mods {
+		'clicker' {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+// In-game verification: `gradlew runClientGameTest` starts a real 1.21.11 client, creates a world and drives
+// Clicker with simulated keyboard/mouse input (see src/gametest). Screenshots land in build/run/clientGameTest.
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = 'clicker-gametest'
+		enableGameTests = false
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings loom.officialMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Mod Menu is optional at runtime: compile against its API, and load it in the dev client only.
+	modCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
+	modLocalRuntime "com.terraformersmc:modmenu:${project.modmenu_version}"
+
+	// Plain unit tests for the timing, double-click and config logic (no game needed).
+	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+	}
+	// Minecraft's logging config writes logs/ into the working directory; keep that inside build/.
+	def testRunDir = layout.buildDirectory.dir('test-run')
+	workingDir = testRunDir.get().asFile
+	doFirst {
+		testRunDir.get().asFile.mkdirs()
+	}
+}
+
+processResources {
+	def version = project.version
+	inputs.property 'version', version
+
+	filesMatching('fabric.mod.json') {
+		expand 'version': version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Production check: run the same in-game tests against the *built, remapped* jar in a production-style client
+// (official Minecraft jar + intermediary mappings + Fabric Loader), exactly as players will run it.
+//   gradlew runProductionClientGameTest
+// ---------------------------------------------------------------------------------------------------------------
+configurations {
+	productionRuntimeMods {
+		transitive = false
+	}
+}
+
+dependencies {
+	productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// The client gametest module is not part of the published fabric-api jar.
+	productionRuntimeMods fabricApi.module('fabric-client-gametest-api-v1', project.fabric_api_version)
+	productionRuntimeMods "com.terraformersmc:modmenu:${project.modmenu_version}"
+}
+
+def gametestJar = tasks.register('gametestJar', Jar) {
+	from sourceSets.gametest.output
+	archiveClassifier = 'gametest-dev'
+	destinationDirectory = layout.buildDirectory.dir('devlibs')
+}
+
+def remapGametestJar = tasks.register('remapGametestJar', net.fabricmc.loom.task.RemapJarTask) {
+	inputFile = gametestJar.flatMap { it.archiveFile }
+	archiveClassifier = 'gametest'
+	destinationDirectory = layout.buildDirectory.dir('gametestlibs')
+	addNestedDependencies = false
+}
+
+tasks.register('runProductionClientGameTest', net.fabricmc.loom.task.prod.ClientProductionRunTask) {
+	group = 'verification'
+	description = 'Runs the in-game tests against build/libs/clicker-<version>.jar in a production-style client.'
+	mods.from(configurations.productionRuntimeMods)
+	mods.from(tasks.named('remapJar'))
+	mods.from(remapGametestJar)
+	jvmArgs.add('-Dfabric.client.gametest')
+	// Fail with a log message instead of waiting on Fabric's error window.
+	jvmArgs.add('-Dfabric.noGui=true')
+	runDir = layout.buildDirectory.dir('run/productionClientGameTest')
+}
